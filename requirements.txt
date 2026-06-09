@@ -1,0 +1,6 @@
+anthropic
+instagrapi
+python-dotenv
+schedule
+Pillow
+requests
