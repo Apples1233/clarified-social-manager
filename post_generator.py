@@ -1,97 +1,128 @@
 import anthropic
-import random
-import os
-from pathlib import Path
 import base64
-
-client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-
-CAPTION_STYLES = [
-      "hype/streetwear",
-      "minimal and clean",
-      "storytelling lifestyle",
-      "bold and confident",
-      "community-focused",
-      "question-based engagement",
-      "product highlight",
-      "limited drop energy",
-]
-
-HASHTAG_SETS = [
-      "#clarified #clarifiedhats #truckerhat #hatgang #streetwear #snapback #hatlife #fitted #headwear #streetstyle",
-      "#clarified #hatcollection #drip #fashion #mensfashion #womensfashion #accessories #ootd #swag #style",
-      "#clarified #boshi #embroidered #premiumhats #capsofinstagram #hatoftheday #newera #hathead #flexfit",
-      "#clarified #streetwearfashion #urbanstyle #hatgame #capsule #wearitwell #boldstyle #dailylook #brandname",
-]
+import os
+import random
+from pathlib import Path
 
 
-def get_hat_images():
-      hat_dir = Path("assets/hats")
-      hat_dir.mkdir(parents=True, exist_ok=True)
-      images = []
-      supported = (".jpg", ".jpeg", ".png", ".webp")
-      for img_path in hat_dir.iterdir():
-                if img_path.suffix.lower() in supported:
-                              with open(img_path, "rb") as f:
-                                                data = base64.standard_b64encode(f.read()).decode("utf-8")
-                                            ext = img_path.suffix.lower().lstrip(".")
-                              media_type = "image/jpeg" if ext in ("jpg", "jpeg") else f"image/{ext}"
-                              images.append({"path": str(img_path), "data": data, "media_type": media_type})
-                      return images
+def encode_image(image_path: str) -> dict:
+    """Encode image to base64 for Claude API."""
+    with open(image_path, "rb") as f:
+        data = f.read()
+    
+    ext = Path(image_path).suffix.lower()
+    media_types = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp"
+    }
+    media_type = media_types.get(ext, "image/jpeg")
+    
+    return {
+        "data": base64.standard_b64encode(data).decode("utf-8"),
+        "media_type": media_type,
+        "path": image_path
+    }
 
 
-def generate_post(style=None, hat_image_path=None):
-      style = style or random.choice(CAPTION_STYLES)
-      hashtags = random.choice(HASHTAG_SETS)
-      images = get_hat_images()
-
+def get_hat_images(assets_dir: str = "assets/hats") -> list:
+    """Get all hat images from the assets directory."""
+    assets_path = Path(assets_dir)
+    if not assets_path.exists():
+        raise FileNotFoundError(f"Assets directory not found: {assets_dir}")
+    
+    extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+    images = []
+    for f in assets_path.iterdir():
+        if f.suffix.lower() in extensions and f.name != ".gitkeep":
+            images.append(str(f))
+    
     if not images:
-              raise FileNotFoundError("No hat images found in assets/hats/. Add your product photos.")
+        raise ValueError(f"No images found in {assets_dir}")
+    
+    return images
 
-    selected = next((img for img in images if img["path"] == hat_image_path), None)
-    if selected is None:
-              selected = random.choice(images)
 
-    prompt = (
-              f'You are a creative social media manager for CLARIFIED, a premium streetwear hat brand by BOSHI.\n\n'
-              f'The hats feature bold embroidered CLARIFIED branding in white with a mesh trucker-style back.\n'
-              f'Available in navy blue and black colorways.\n\n'
-              f'Generate a single Instagram caption in the "{style}" style.\n\n'
-              f'Requirements:\n'
-              f'- 1-4 sentences max, punchy and on-brand\n'
-              f'- No emojis unless completely natural (1-2 max)\n'
-              f'- Bold, confident, street-ready brand voice\n'
-              f'- Do NOT include hashtags\n'
-              f'- Make it feel fresh and different each time\n\n'
-              f'Return ONLY the caption text, nothing else.'
-    )
+def generate_caption(image_path: str, api_key: str) -> str:
+    """Generate an Instagram caption using Claude AI."""
+    client = anthropic.Anthropic(api_key=api_key)
+    
+    image_data = encode_image(image_path)
+    
+    styles = [
+        "hype and energetic with lots of emojis",
+        "clean and minimal, very short and punchy",
+        "storytelling and lifestyle-focused",
+        "question-based to drive engagement",
+        "bold statement style with attitude"
+    ]
+    style = random.choice(styles)
+    
+    prompt = f"""You are a social media expert for Clarified, a streetwear hat brand by BOSHI.
+    
+Look at this hat product photo and create an Instagram caption in a {style} style.
+
+Requirements:
+- Keep it under 150 words
+- Include 5-10 relevant hashtags at the end
+- Make it feel authentic and on-brand for streetwear
+- Focus on the hat's quality, style, and the Clarified brand identity
+- Hashtags should include: #Clarified #BOSHI and relevant streetwear/hat tags
+
+Write only the caption text and hashtags, nothing else."""
 
     message = client.messages.create(
-              model="claude-opus-4-5",
-              max_tokens=300,
-              messages=[
-                            {
-                                              "role": "user",
-                                              "content": [
-                                                                    {
-                                                                                              "type": "image",
-                                                                                              "source": {
-                                                                                                                            "type": "base64",
-                                                                                                                            "media_type": selected["media_type"],
-                                                                                                                            "data": selected["data"],
-                                                                                                },
-                                                                    },
-                                                                    {"type": "text", "text": prompt},
-                                              ],
-                            }
-              ],
+        model="claude-opus-4-5",
+        max_tokens=300,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": image_data["media_type"],
+                            "data": image_data["data"],
+                        },
+                    },
+                    {"type": "text", "text": prompt}
+                ],
+            }
+        ],
     )
-
+    
     caption = message.content[0].text.strip()
-    full_caption = caption + "\n\n" + hashtags
+    hashtags = "#Clarified #BOSHI #streetwear #hats #trucker"
+    
+    if "#" not in caption:
+        full_caption = caption + "\n\n" + hashtags
+    else:
+        full_caption = caption
+    
+    return full_caption
 
+
+def select_random_hat(assets_dir: str = "assets/hats") -> str:
+    """Select a random hat image."""
+    images = get_hat_images(assets_dir)
+    return random.choice(images)
+
+
+def generate_post(assets_dir: str = "assets/hats", api_key: str = None) -> dict:
+    """Generate a complete post with image and caption."""
+    if api_key is None:
+        api_key = os.environ.get("CLAUDEKEY") or os.environ.get("ANTHROPIC_API_KEY")
+    
+    if not api_key:
+        raise ValueError("No API key provided. Set CLAUDEKEY environment variable.")
+    
+    image_path = select_random_hat(assets_dir)
+    caption = generate_caption(image_path, api_key)
+    
     return {
-              "caption": full_caption,
-              "image_path": selected["path"],
-              "style_used": style,
+        "image_path": image_path,
+        "caption": caption
     }
