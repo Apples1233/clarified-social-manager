@@ -2,26 +2,26 @@ name: Daily Instagram Post
 
 on:
   schedule:
-      - cron: '0 14 * * *'
-        workflow_dispatch:
+    - cron: '0 14 * * *'
+  workflow_dispatch:
 
-        jobs:
-          post:
-              runs-on: ubuntu-latest
-                  steps:
-                        - uses: actions/checkout@v4
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-                              - name: Set up Python
-                                      uses: actions/setup-python@v5
-                                              with:
-                                                        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-                                                              - name: Install dependencies
-                                                                      run: pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-                                                                            - name: Run daily post
-                                                                                    env:
-                                                                                              ANTHROPIC_API_KEY: ${{ secrets.CLAUDEKEY }}
-                                                                                                        INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
-                                                                                                                  INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
-                                                                                                                          run: python main.py --post-now
+      - name: Run daily post
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.CLAUDEKEY }}
+          INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
+          INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
+        run: python main.py --post-now
