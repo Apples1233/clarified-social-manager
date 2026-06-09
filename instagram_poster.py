@@ -1,36 +1,39 @@
 import os
 from instagrapi import Client
-from instagrapi.exceptions import LoginRequired
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 SESSION_FILE = "session.json"
 
 
-def get_client():
-      """Get authenticated Instagram client, reusing session if available."""
-      cl = Client()
-      cl.delay_range = [2, 5]
-
-    if Path(SESSION_FILE).exists():
-              try:
-                            cl.load_settings(SESSION_FILE)
-                            cl.login(os.getenv("INSTAGRAM_USERNAME"), os.getenv("INSTAGRAM_PASSWORD"))
-                            cl.get_timeline_feed()
-                            print("Reused existing Instagram session.")
-                            return cl
-except (LoginRequired, Exception):
-            print("Session expired. Re-logging in...")
-            Path(SESSION_FILE).unlink(missing_ok=True)
-
-    cl.login(os.getenv("INSTAGRAM_USERNAME"), os.getenv("INSTAGRAM_PASSWORD"))
-    cl.dump_settings(SESSION_FILE)
-    print("Logged into Instagram successfully.")
-    return cl
-
-
-def post_photo(image_path, caption):
-      """Post a single photo to Instagram."""
-      cl = get_client()
-      media = cl.photo_upload(path=image_path, caption=caption)
-      print(f"Posted to Instagram! Media ID: {media.pk}")
-      return {"media_id": str(media.pk), "image": image_path}
+def post_to_instagram(image_path: str, caption: str, username: str, password: str) -> str:
+    """Post an image to Instagram."""
+    cl = Client()
+    cl.delay_range = [2, 5]
+    
+    session_path = Path(SESSION_FILE)
+    
+    if session_path.exists():
+        try:
+            cl.load_settings(SESSION_FILE)
+            cl.login(username, password)
+            logger.info("Logged in using saved session")
+        except Exception:
+            logger.info("Session expired, logging in fresh")
+            session_path.unlink(missing_ok=True)
+            cl.login(username, password)
+            cl.dump_settings(SESSION_FILE)
+    else:
+        cl.login(username, password)
+        cl.dump_settings(SESSION_FILE)
+        logger.info("Logged in and saved session")
+    
+    image_path_obj = Path(image_path)
+    if not image_path_obj.exists():
+        raise FileNotFoundError(f"Image not found: {image_path}")
+    
+    media = cl.photo_upload(str(image_path_obj), caption)
+    logger.info(f"Posted successfully! Media ID: {media.pk}")
+    return str(media.pk)
