@@ -1,15 +1,18 @@
-import anthropic
+import openai
 import base64
 import os
 import random
 from pathlib import Path
 
 
-def encode_image(image_path: str) -> dict:
-    """Encode image to base64 for Claude API."""
+def encode_image(image_path: str) -> str:
+    """Encode image to base64 string for OpenAI API."""
     with open(image_path, "rb") as f:
-        data = f.read()
+        return base64.b64encode(f.read()).decode("utf-8")
 
+
+def get_image_media_type(image_path: str) -> str:
+    """Get the media type based on file extension."""
     ext = Path(image_path).suffix.lower()
     media_types = {
         ".jpg": "image/jpeg",
@@ -18,13 +21,7 @@ def encode_image(image_path: str) -> dict:
         ".gif": "image/gif",
         ".webp": "image/webp"
     }
-    media_type = media_types.get(ext, "image/jpeg")
-
-    return {
-        "data": base64.standard_b64encode(data).decode("utf-8"),
-        "media_type": media_type,
-        "path": image_path
-    }
+    return media_types.get(ext, "image/jpeg")
 
 
 def get_hat_name(image_path: str) -> str:
@@ -53,11 +50,12 @@ def get_hat_images(assets_dir: str = "assets/hats") -> list:
 
 
 def generate_caption(image_path: str, api_key: str) -> str:
-    """Generate an Instagram caption using Claude AI."""
-    client = anthropic.Anthropic(api_key=api_key)
+    """Generate an Instagram caption using ChatGPT (GPT-4o) with vision."""
+    client = openai.OpenAI(api_key=api_key)
 
-    image_data = encode_image(image_path)
     hat_name = get_hat_name(image_path)
+    image_data = encode_image(image_path)
+    media_type = get_image_media_type(image_path)
 
     styles = [
         "hype and energetic with lots of emojis",
@@ -82,28 +80,29 @@ Requirements:
 
 Write only the caption text and hashtags, nothing else."""
 
-    message = client.messages.create(
-        model="claude-opus-4-5",
-        max_tokens=300,
+    response = client.chat.completions.create(
+        model="gpt-4o",
         messages=[
             {
                 "role": "user",
                 "content": [
                     {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": image_data["media_type"],
-                            "data": image_data["data"],
-                        },
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{media_type};base64,{image_data}"
+                        }
                     },
-                    {"type": "text", "text": prompt}
-                ],
+                    {
+                        "type": "text",
+                        "text": prompt
+                    }
+                ]
             }
         ],
+        max_tokens=300
     )
 
-    caption = message.content[0].text.strip()
+    caption = response.choices[0].message.content.strip()
     hashtags = "#Clarified #BOSHI #streetwear #hats #trucker"
 
     if "#" not in caption:
@@ -123,10 +122,10 @@ def select_random_hat(assets_dir: str = "assets/hats") -> str:
 def generate_post(assets_dir: str = "assets/hats", api_key: str = None) -> dict:
     """Generate a complete post with image and caption."""
     if api_key is None:
-        api_key = os.environ.get("CLAUDEKEY") or os.environ.get("ANTHROPIC_API_KEY")
+        api_key = os.environ.get("OPENAI_API_KEY")
 
     if not api_key:
-        raise ValueError("No API key provided. Set CLAUDEKEY environment variable.")
+        raise ValueError("No API key provided. Set OPENAI_API_KEY environment variable.")
 
     image_path = select_random_hat(assets_dir)
     caption = generate_caption(image_path, api_key)
