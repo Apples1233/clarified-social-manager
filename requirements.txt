@@ -1,4 +1,4 @@
-anthropic
+openai
 instagrapi
 python-dotenv
 schedule
