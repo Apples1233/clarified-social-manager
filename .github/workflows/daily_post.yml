@@ -21,7 +21,7 @@ jobs:
 
       - name: Run daily post
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.CLAUDEKEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
           INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
         run: python main.py --post-now
